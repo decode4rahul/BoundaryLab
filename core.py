@@ -28,13 +28,24 @@ class Evidence:
 
 
 def verify(events, checkpoint):
-    previous = '0'*64
-    for i, event in enumerate(events):
-        body = {k:v for k,v in event.items() if k != 'hash'}
-        if body.get('seq') != i or body.get('run_id') != checkpoint['run_id'] or body.get('previous') != previous or event.get('hash') != digest(body):
+    try:
+        if not isinstance(events, list) or not isinstance(checkpoint, dict):
             return False
-        previous = event['hash']
-    return len(events) == checkpoint['count'] and hmac.compare_digest(previous, checkpoint['head'])
+        if set(checkpoint) != {'run_id','count','head'} or type(checkpoint['count']) is not int:
+            return False
+        if not isinstance(checkpoint['run_id'], str) or not isinstance(checkpoint['head'], str):
+            return False
+        previous = '0'*64
+        for i, event in enumerate(events):
+            if not isinstance(event,dict) or set(event) != {'run_id','seq','previous','kind','details','hash'}:
+                return False
+            body = {k:v for k,v in event.items() if k != 'hash'}
+            if type(body['seq']) is not int or body['seq'] != i or body['run_id'] != checkpoint['run_id'] or body['previous'] != previous or event['hash'] != digest(body):
+                return False
+            previous = event['hash']
+        return len(events) == checkpoint['count'] and hmac.compare_digest(previous, checkpoint['head'])
+    except (TypeError, ValueError, KeyError, OverflowError):
+        return False
 
 
 @dataclass(frozen=True)
